@@ -1,26 +1,13 @@
 const cors = require("cors");
 const express = require("express");
-const mysql = require("mysql");
-const bcrypt = require("bcrypt");
-const jwt = require("jsonwebtoken");
-
-const config = require("./config.js");
-const { validateEmail, validatePassword } = require("./utils.js");
+const bodyParser = require("body-parser").json();
 
 const app = express();
 app.use(cors());
-const port = 5000;
-const connection = mysql.createConnection({
-  host: config.databaseHost,
-  user: config.databaseUser,
-  password: config.databasePassword,
-  database: "work_structure",
-});
+app.use(bodyParser);
 
-connection.connect(function (err) {
-  if (err) throw err;
-  console.log("Connected!");
-});
+const port = 5000;
+
 // signup
 // login
 // verify
@@ -48,129 +35,56 @@ connection.connect(function (err) {
 // getNotifications
 //
 
-app.get("/", function (req, res) {
-  return res.send("Welcome to work structure backend");
-});
+const UserAuth = require("./common/userAuth.js");
 
-// signup
-app.post("/signup", function (req, res) {
-  let fullname = req.query.fullname;
-  let email = req.query.email;
-  let password = req.query.password;
+const {
+  signup,
+  login,
+  requestReset,
+  verify,
+  resetPassword,
+} = require("./routes/users.js");
+const {
+  getStores,
+  addStore,
+  editStore,
+  deleteStore,
+} = require("./routes/stores.js");
+const {
+  getTasks,
+  addTask,
+  editTask,
+  deleteTask,
+  getTaskHistory,
+} = require("./routes/tasks.js");
+const {
+  getProducts,
+  addProduct,
+  editProduct,
+  deleteProduct,
+} = require("./routes/products.js");
 
-  // validating user inputs
-  if (fullname === undefined || email === undefined || password === undefined) {
-    return res.send({ error: "Missing parameters." }).status(400);
-  }
-  if (fullname === "" || email === "" || password === "") {
-    return res.send({ error: "Fields cannot be empty." }).status(400);
-  }
-  if (!validateEmail(email)) {
-    return res.send({ error: "Invalid email address." }).status(400);
-  }
-  if (!validatePassword(password)) {
-    return res
-      .send({
-        error:
-          "Password must contain atleast one uppercase letter, one lowercase letter, one special character and must be atleast 6 characters long.",
-      })
-      .status(400);
-  }
+app.post("/users/signup", signup);
+app.get("/users/login", login);
+app.post("/users/requestReset", requestReset);
+app.post("/users/verify", verify);
+app.post("/users/resetPassword", UserAuth, resetPassword);
 
-  // verifying new user and storing in database
-  connection.query(
-    "SELECT * FROM users WHERE email = ?",
-    [email],
-    function (error, results, fields) {
-      if (results.length !== 0) {
-        return res
-          .send({ error: "Account already exists. Please login instead." })
-          .status(400);
-      }
-      hashPassword = bcrypt.hashSync(password, 10);
-      connection.query(
-        "INSERT INTO users (email, name, password, isVerified) VALUES (?, ?, ?, ?)",
-        [email, fullname, hashPassword, 0],
-        function (error, result) {
-          if (error)
-            return res.send({ error: "Unexpected error occured." }).status(500);
-          connection.query(
-            "SELECT * FROM users WHERE email = ?",
-            [email],
-            function (error, results, fields) {
-              let userToken = jwt.sign(
-                {
-                  userId: results[0].userId,
-                  email: results[0].email,
-                  fullname: results[0].name,
-                  isVerified: results[0].isVerified,
-                },
-                config.tokenSecret,
-                { expiresIn: "1h" }
-              );
-              return res
-                .send({
-                  token: userToken,
-                  message: "Account created successfully.",
-                })
-                .status(200);
-            }
-          );
-        }
-      );
-    }
-  );
-});
+app.get("/stores", UserAuth, getStores);
+app.post("/store", UserAuth, addStore);
+app.use("/store/:storeId", UserAuth, editStore);
+app.delete("/store/:storeId", UserAuth, deleteStore);
 
-// login
-app.get("/login", function (req, res) {
-  let email = req.query.email;
-  let password = req.query.password;
+app.get("/tasks", UserAuth, getTasks);
+app.post("/task", UserAuth, addTask);
+app.use("/task/:taskId", UserAuth, editTask);
+app.delete("/task/:taskId", UserAuth, deleteTask);
+app.get("/task/:taskId/history", UserAuth, getTaskHistory);
 
-  // validating user inputs
-  if (email === undefined || password === undefined) {
-    return res.send({ error: "Missing parameters." }).status(400);
-  }
-  if (email === "" || password === "") {
-    return res.send({ error: "Fields cannot be empty." }).status(400);
-  }
-  if (!validateEmail(email)) {
-    return res.send({ error: "Invalid email address." }).status(400);
-  }
-
-  // verifying user and send the auth token
-  connection.query(
-    "SELECT * FROM users WHERE email = ?",
-    [email],
-    function (error, results, fields) {
-      if (error)
-        return res.send({ error: "Unexpected error occured." }).status(500);
-      if (results.length === 0) {
-        return res
-          .send({ error: "Account not registered. Please signup instead." })
-          .status(400);
-      }
-      let authorized = bcrypt.compareSync(password, results[0].password);
-      if (!authorized)
-        return res
-          .send({ error: "Incorrect Password. Please try again." })
-          .status(400);
-      let userToken = jwt.sign(
-        {
-          userId: results[0].userId,
-          email: results[0].email,
-          fullname: results[0].name,
-          isVerified: results[0].isVerified,
-        },
-        config.tokenSecret,
-        { expiresIn: "1h" }
-      );
-      return res
-        .send({ token: userToken, message: "Login successfull." })
-        .status(200);
-    }
-  );
-});
+app.get("/products", UserAuth, getProducts);
+app.post("/product", UserAuth, addProduct);
+app.use("/product/:productId", UserAuth, editProduct);
+app.delete("/product/:productId", UserAuth, deleteProduct);
 
 // server listening at the port
 app.listen(port, function () {
