@@ -40,15 +40,18 @@ const UserAuth = require("./common/userAuth.js");
 const {
   signup,
   login,
-  requestReset,
   verify,
   resetPassword,
+  requestPasswordReset,
+  changePassword,
+  deleteUser,
 } = require("./routes/users.js");
 const {
   getStores,
   addStore,
   editStore,
   deleteStore,
+  getStore,
 } = require("./routes/stores.js");
 const {
   getTasks,
@@ -66,13 +69,16 @@ const {
 
 app.post("/users/signup", signup);
 app.get("/users/login", login);
-app.post("/users/requestReset", requestReset);
 app.post("/users/verify", verify);
-app.post("/users/resetPassword", UserAuth, resetPassword);
+app.post("/users/requestPasswordReset", requestPasswordReset);
+app.put("/users/resetPassword", resetPassword);
+app.put("/users/changePassword", UserAuth, changePassword);
+app.delete("/users/delete", UserAuth, deleteUser);
 
 app.get("/stores", UserAuth, getStores);
 app.post("/store", UserAuth, addStore);
-app.use("/store/:storeId", UserAuth, editStore);
+app.get("/store/:storeId", UserAuth, getStore);
+app.put("/store/:storeId", UserAuth, editStore);
 app.delete("/store/:storeId", UserAuth, deleteStore);
 
 app.get("/tasks", UserAuth, getTasks);
